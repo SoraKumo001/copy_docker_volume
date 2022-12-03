@@ -1,0 +1,58 @@
+#!/bin/bash
+
+if [ $# = 0 ]; then
+  echo "copy_dcoker_volumes [src_volume] [dest_volume]" 1>&2
+  echo "-hs [src host]          src host address" 1>&2
+  echo "-hd [dest host]         dest host address" 1>&2
+  echo "-a                      copy to all volumes" 1>&2
+  exit 1
+fi
+
+src_host=
+dest_host=
+all=
+files=() 
+
+while (( $# > 0 ));do
+    case ${1} in
+        -hs)
+            src_host=${2}
+            shift 1
+        ;;
+        -hd)
+            dest_host=${2}
+            shift 1
+        ;;
+        -a)
+            all=1
+        ;;
+        *)
+          files+=(${1})
+    esac
+    shift 1
+done
+
+if [ -n "$src_host" ]; then
+  SHOST="--tls -H $src_host"
+fi 
+
+if [ -n "$dest_host" ]; then
+  DHOST="--tls -H $dest_host"
+fi
+
+if [ -n "${files[0]}" ]; then
+  SVOLUME="${files[0]}"
+  DVOLUME="${files[0]}"
+fi
+
+if [ -n "${files[1]}" ]; then
+  DVOLUME="${files[1]}"
+fi
+
+if [ -n "$all" ]; then
+  for volume in `docker volume ls -q`;do
+    docker run $SHOST --rm -v $volume:/backup dktools/backup |  docker $DHOST run --rm -i -v $volume:/backup dktools/restore
+  done
+else
+  docker $SHOST run --rm -v $SVOLUME:/backup dktools/backup |  docker $DHOST run --rm -i -v $DVOLUME:/backup dktools/restore
+fi
